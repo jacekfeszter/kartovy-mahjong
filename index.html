@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kartový pomocník</title>
+<style>
+  :root{
+    --paper:#efe6d2; --panel:#fbf8f0; --ink:#241f17; --muted:#6f6656;
+    --felt:#1f6b4a; --felt-dark:#164e37; --red:#c22b2b; --black:#241f17;
+    --gold:#e0a52e; --line:#d8cdb2; --ok:#2e7d52;
+    --left:#2f6fb0; --right:#c9791f;
+  }
+  *{box-sizing:border-box} html,body{margin:0}
+  body{background:var(--paper);color:var(--ink);
+    font-family:-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-size:20px;line-height:1.5;padding:18px 14px 90px;}
+  .wrap{max-width:760px;margin:0 auto}
+  h1{font-family:Georgia,serif;font-size:32px;margin:0 0 14px;text-align:center}
+
+  /* horný ukazovateľ krokov */
+  .stepper{display:flex;gap:6px;justify-content:center;margin:0 0 18px}
+  .stepper .s{flex:1;max-width:190px;text-align:center;font-size:15px;color:var(--muted);
+    border-top:5px solid var(--line);padding-top:8px;font-weight:600}
+  .stepper .s.on{color:var(--felt);border-color:var(--felt)}
+  .stepper .s b{display:block;font-size:22px;font-family:Georgia,serif}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:22px}
+  .panel[hidden]{display:none}
+  .panel h2{font-family:Georgia,serif;font-size:25px;margin:0 0 8px}
+  .lead{color:var(--muted);font-size:18px;margin:0 0 18px}
+
+  .btn{font:inherit;font-weight:700;border:none;border-radius:14px;padding:16px 26px;cursor:pointer;
+    background:var(--felt);color:#fff;transition:transform .05s,background .15s;font-size:21px}
+  .btn:hover{background:var(--felt-dark)} .btn:active{transform:translateY(1px)}
+  .btn:disabled{background:#c2b9a3;cursor:default}
+  .btn.ghost{background:transparent;color:var(--ink);border:2px solid var(--line);font-size:18px;padding:13px 20px}
+  .btn.ghost:hover{background:#efe9db}
+  .btn.huge{font-size:24px;padding:20px 30px;width:100%}
+  .btn.wide{width:100%}
+  .center{text-align:center}
+  .rowbtns{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:8px}
+
+  /* krok 1 */
+  .drop{border:3px dashed var(--line);border-radius:16px;padding:26px;text-align:center;background:#fffdf7}
+  .drop.hot{border-color:var(--felt);background:#f2f8f2}
+  .drop small{display:block;color:var(--muted);margin-top:12px;font-size:16px}
+  #preview{max-width:100%;max-height:260px;border-radius:12px;margin-top:16px;display:none;border:1px solid var(--line)}
+  .status{margin-top:14px;font-size:18px;color:var(--muted);min-height:1.4em;text-align:center}
+  .status.err{color:var(--red);font-weight:700} .status.ok{color:var(--ok);font-weight:700}
+  .spinner{display:inline-block;width:18px;height:18px;border:3px solid var(--line);border-top-color:var(--felt);border-radius:50%;animation:spin .8s linear infinite;vertical-align:-3px;margin-right:8px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* karty */
+  .card{position:relative;flex:0 0 auto;border-radius:8px;background:#fff;border:1px solid #cfc4a8;
+    box-shadow:0 1px 2px rgba(0,0,0,.14);display:flex;flex-direction:column;align-items:center;justify-content:center;
+    font-family:Georgia,serif;user-select:none}
+  .card .rank{font-weight:700;line-height:1}
+  .card .suit{line-height:1;margin-top:2px}
+  .card.red{color:var(--red)} .card.black{color:var(--black)}
+
+  /* krok 2 – kontrola figúrok */
+  .checkgroup{margin:6px 0 20px}
+  .checkgroup h3{font-family:Georgia,serif;font-size:20px;margin:0 0 4px}
+  .checkgroup .sub{color:var(--muted);font-size:16px;margin:0 0 12px}
+  .checkrow{display:flex;flex-wrap:wrap;gap:14px}
+  .checkitem{width:150px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px;text-align:center}
+  .checkitem .card{width:64px;height:90px;margin:0 auto 8px}
+  .checkitem .card .rank{font-size:24px}.checkitem .card .suit{font-size:26px}
+  .checkitem .lbl{font-size:18px;font-weight:700;margin-bottom:2px}
+  .checkitem .where{font-size:14px;color:var(--muted);margin-bottom:10px}
+  .toggle{font:inherit;font-size:16px;font-weight:700;border:2px solid var(--line);background:#fbf5e7;
+    border-radius:10px;padding:9px 8px;width:100%;cursor:pointer}
+  .toggle:hover{border-color:var(--gold)}
+  .morelink{margin:4px 0 18px;text-align:center}
+  .morelink button{background:none;border:none;color:var(--felt);font:inherit;font-size:17px;text-decoration:underline;cursor:pointer}
+
+  /* jednoduchý editor ostatných kariet */
+  #fullEdit{display:none;margin-top:12px;border-top:1px solid var(--line);padding-top:14px}
+  #fullEdit.on{display:block}
+  .grid{display:flex;flex-direction:column;gap:8px;overflow-x:auto}
+  .erow{display:flex;gap:6px}
+  .grid .card{width:44px;height:62px;cursor:pointer}
+  .grid .card .rank{font-size:17px}.grid .card .suit{font-size:19px}
+  .grid .card.sel{outline:3px solid var(--gold);outline-offset:2px}
+  .editbox{margin-top:12px;display:none} .editbox.on{display:block}
+  .picks{display:flex;flex-wrap:wrap;gap:7px;margin:6px 0 12px}
+  .pick{border:2px solid var(--line);background:#fff;border-radius:9px;padding:7px 11px;font:inherit;font-size:17px;cursor:pointer;font-family:Georgia,serif}
+  .pick.on{border-color:var(--felt);background:#eef7ef} .pick.red{color:var(--red)}.pick.black{color:var(--black)}
+
+  /* krok 3 – sprievodca */
+  .progress{height:12px;background:#e6dcc4;border-radius:8px;overflow:hidden;margin:0 0 6px}
+  .progress > i{display:block;height:100%;background:var(--felt);transition:width .25s}
+  .progtext{text-align:center;font-size:17px;color:var(--muted);margin:0 0 16px}
+
+  .focus{display:flex;gap:18px;align-items:center;justify-content:center;flex-wrap:wrap;
+    background:#fff;border:2px solid var(--gold);border-radius:18px;padding:20px;margin-bottom:6px}
+  .focus .card{width:110px;height:154px}
+  .focus .card .rank{font-size:40px}.focus .card .suit{font-size:44px}
+  .focus .txt{min-width:170px}
+  .focus .take{font-size:20px;color:var(--muted);margin:0 0 6px}
+  .focus .side{display:inline-flex;align-items:center;gap:8px;font-size:28px;font-weight:800;
+    padding:8px 16px;border-radius:12px;color:#fff}
+  .focus .side.L{background:var(--left)} .focus .side.R{background:var(--right)}
+  .focus .where{font-size:22px;margin-top:10px;font-weight:700}
+
+  .maplbl{text-align:center;color:var(--muted);font-size:15px;margin:16px 0 6px}
+  .board{background:radial-gradient(120% 140% at 50% 0%,#2a7d58 0%,var(--felt) 45%,var(--felt-dark) 100%);
+    border-radius:16px;padding:12px 10px;overflow-x:auto;box-shadow:inset 0 0 30px rgba(0,0,0,.25)}
+  .brow{display:flex;gap:6px;align-items:center;margin:5px 0}
+  .brow.active{background:rgba(255,255,255,.10);border-radius:10px}
+  .brow .rn{flex:0 0 auto;width:26px;color:#fff;font-weight:800;font-size:18px;text-align:center;opacity:.85}
+  .board .card{width:40px;height:56px}
+  .board .card .rank{font-size:15px}.board .card .suit{font-size:16px}
+  .board .card.done{opacity:0;visibility:hidden}
+  .board .card.empty{background:transparent;border:1px dashed rgba(255,255,255,.28);box-shadow:none}
+  .board .card.target{outline:4px solid var(--gold);outline-offset:2px;transform:scale(1.14);z-index:2;
+    box-shadow:0 0 0 6px rgba(224,165,46,.35);animation:pulse 1.05s ease-in-out infinite}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 6px rgba(224,165,46,.30)}50%{box-shadow:0 0 0 11px rgba(224,165,46,.06)}}
+  .board .card .tu{position:absolute;top:-20px;left:50%;transform:translateX(-50%);color:var(--gold);
+    font-size:20px;font-weight:900;text-shadow:0 1px 2px rgba(0,0,0,.5)}
+
+  .nav{position:sticky;bottom:0;background:linear-gradient(transparent,var(--paper) 30%);padding-top:14px;margin-top:18px}
+  .nav .big{width:100%}
+  .nav .sub{display:flex;gap:10px;justify-content:center;margin-top:10px}
+  .done-msg{text-align:center;padding:24px 10px}
+  .done-msg .big-emoji{font-size:56px}
+  .done-msg h2{margin:8px 0}
+
+  details{margin-top:18px} summary{cursor:pointer;font-size:17px;color:var(--muted);font-weight:600}
+  ol.list{padding-left:24px} ol.list li{margin:5px 0;font-size:17px} ol.list b{font-weight:800}
+
+  @media (max-width:540px){
+    body{font-size:19px} h1{font-size:27px}
+    .stepper .s{font-size:13px}.stepper .s b{font-size:19px}
+    .focus{gap:12px;padding:16px}.focus .card{width:92px;height:128px}
+    .focus .card .rank{font-size:32px}.focus .card .suit{font-size:36px}
+    .checkitem{width:calc(50% - 7px)}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Kartový pomocník</h1>
+  <div class="stepper">
+    <div class="s on" id="st1"><b>1</b>Obrázok</div>
+    <div class="s" id="st2"><b>2</b>Kontrola</div>
+    <div class="s" id="st3"><b>3</b>Riešenie</div>
+  </div>
+
+  <!-- KROK 1 -->
+  <section class="panel" id="s1">
+    <h2>Vlož obrázok hry</h2>
+    <p class="lead">Odfoť si obrazovku (klávesa Print Screen) a vlož ju sem.</p>
+    <div class="drop" id="drop">
+      <button class="btn huge" id="pickBtn">Vybrať obrázok</button>
+      <input type="file" id="file" accept="image/*" hidden>
+      <small>alebo stlač <b>Ctrl + V</b> a obrázok sa vloží sám</small>
+      <img id="preview" alt="Vložený obrázok">
+    </div>
+    <div id="readRow" style="margin-top:18px;display:none">
+      <button class="btn huge" id="readBtn">Prečítať karty ▶</button>
+    </div>
+    <div class="status" id="s1status"></div>
+  </section>
+
+  <!-- KROK 2 -->
+  <section class="panel" id="s2" hidden>
+    <h2>Skontroluj figúrky</h2>
+    <p class="lead">Pri kráľoch, dámach, dolníkoch a esách sa občas pomýli farba. Pozri každú kartu s hrou. <b>Ak sedí, nič nerob.</b> Ak nesedí, ťukni na tlačidlo a farba sa zmení.</p>
+
+    <div class="checkgroup" id="grpRed">
+      <h3>Červené figúrky</h3>
+      <p class="sub">Je to srdce ♥, alebo káro ♦?</p>
+      <div class="checkrow" id="redRow"></div>
+    </div>
+    <div class="checkgroup" id="grpBlack">
+      <h3>Čierne figúrky</h3>
+      <p class="sub">Je to kríže ♣ (žaluď), alebo piky ♠ (list)?</p>
+      <div class="checkrow" id="blackRow"></div>
+    </div>
+
+    <div class="morelink"><button id="moreBtn">Potrebujem opraviť aj inú kartu</button></div>
+    <div id="fullEdit">
+      <div class="grid" id="editGrid"></div>
+      <div class="editbox" id="editBox">
+        <div style="font-weight:700;margin-bottom:4px" id="editTitle"></div>
+        <div style="font-size:15px;color:var(--muted)">Hodnota</div>
+        <div class="picks" id="rankPicks"></div>
+        <div style="font-size:15px;color:var(--muted)">Farba</div>
+        <div class="picks" id="suitPicks"></div>
+      </div>
+    </div>
+
+    <div style="margin-top:8px">
+      <button class="btn huge" id="solveBtn">Hotovo, ukáž riešenie ▶</button>
+    </div>
+    <div class="rowbtns"><button class="btn ghost" id="backTo1">◀ Späť na obrázok</button></div>
+  </section>
+
+  <!-- KROK 3 -->
+  <section class="panel" id="s3" hidden>
+    <div class="progress"><i id="progBar"></i></div>
+    <div class="progtext" id="progText"></div>
+
+    <div id="guide">
+      <div class="focus" id="focus"></div>
+      <p class="maplbl">Kde to je na doske:</p>
+      <div class="board" id="board"></div>
+    </div>
+
+    <div id="doneMsg" class="done-msg" hidden>
+      <div class="big-emoji">🎉</div>
+      <h2>Hotovo!</h2>
+      <p class="lead" id="doneText"></p>
+    </div>
+
+    <div class="nav" id="nav">
+      <button class="btn big huge" id="nextBtn">✓ Vzal/-a som ju — ĎALEJ</button>
+      <div class="sub">
+        <button class="btn ghost" id="prevBtn">◀ O krok späť</button>
+        <button class="btn ghost" id="restartBtn">⟲ Od začiatku</button>
+      </div>
+    </div>
+
+    <details><summary>Zobraziť celý postup naraz (zoznam)</summary><ol class="list" id="stepList"></ol></details>
+    <div class="rowbtns" style="margin-top:16px"><button class="btn ghost" id="newImg">Vyriešiť inú hru</button></div>
+  </section>
+</div>
+
+<script>
+const SUIT={H:{sym:'♥',red:true,name:'srdce'},D:{sym:'♦',red:true,name:'káro'},
+            C:{sym:'♣',red:false,name:'kríže'},S:{sym:'♠',red:false,name:'piky'}};
+const OTHER={H:'D',D:'H',C:'S',S:'C'};              // druhá farba tej istej farebnosti
+const RANKS=['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+const RISKY=new Set(['A','J','Q','K']);
+let imgData=null,imgMime=null,grid=[],solution=null,stepIdx=0,editPos=null;
+const $=id=>document.getElementById(id);
+function show(sec){
+  ['s1','s2','s3'].forEach(x=>$(x).hidden=(x!==sec));
+  ['st1','st2','st3'].forEach((x,i)=>$(x).classList.toggle('on', x==='st'+(['s1','s2','s3'].indexOf(sec)+1)));
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function cardEl(card,cls=''){
+  const d=document.createElement('div');const s=SUIT[card.suit];
+  d.className='card '+(s.red?'red':'black')+(cls?' '+cls:'');
+  d.innerHTML=`<span class="rank">${card.rank}</span><span class="suit">${s.sym}</span>`;
+  return d;
+}
+const cname=c=>c.rank+' '+SUIT[c.suit].sym;
+
+/* ---- KROK 1 ---- */
+const drop=$('drop');
+$('pickBtn').onclick=()=>$('file').click();
+$('file').onchange=e=>{if(e.target.files[0])loadImage(e.target.files[0]);};
+['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('hot');}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('hot');}));
+drop.addEventListener('drop',e=>{const f=e.dataTransfer.files[0];if(f&&f.type.startsWith('image/'))loadImage(f);});
+document.addEventListener('paste',e=>{for(const it of e.clipboardData.items){if(it.type.startsWith('image/')){loadImage(it.getAsFile());break;}}});
+function loadImage(file){
+  const r=new FileReader();
+  r.onload=()=>{const u=r.result;imgMime=u.substring(5,u.indexOf(';'));imgData=u.split(',')[1];
+    const p=$('preview');p.src=u;p.style.display='block';$('readRow').style.display='block';
+    setStatus('s1status','Obrázok je vložený. Ťukni na „Prečítať karty".','');};
+  r.readAsDataURL(file);
+}
+function setStatus(id,t,c){const el=$(id);el.className='status'+(c?' '+c:'');el.innerHTML=t;}
+$('readBtn').onclick=readCards;
+async function readCards(){
+  if(!imgData){setStatus('s1status','Najprv vlož obrázok.','err');return;}
+  $('readBtn').disabled=true;
+  setStatus('s1status','<span class="spinner"></span>Čítam karty… chvíľku počkaj.','');
+  try{
+    const res=await fetch('/api/read-cards',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:imgData,mime:imgMime})});
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok) throw new Error(data.error||('HTTP '+res.status));
+    const rows=(data.rows||[]).filter(r=>r.length);
+    if(!rows.length) throw new Error('empty');
+    grid=rows; setStatus('s1status','Hotovo!','ok'); renderCheck(); show('s2');
+  }catch(err){
+    setStatus('s1status','Karty sa nepodarilo prečítať. Skús obrázok orezať len na hraciu plochu a skús znova.','err');
+  }finally{$('readBtn').disabled=false;}
+}
+
+/* ---- KROK 2 ---- */
+function renderCheck(){
+  const red=$('redRow'),black=$('blackRow');red.innerHTML='';black.innerHTML='';
+  let anyRed=false,anyBlack=false;
+  grid.forEach((row,r)=>row.forEach((card,c)=>{
+    if(!RISKY.has(card.rank))return;
+    const item=document.createElement('div');item.className='checkitem';
+    const isRed=SUIT[card.suit].red;
+    item.appendChild(cardEl(card));
+    const lbl=document.createElement('div');lbl.className='lbl';
+    lbl.textContent=SUIT[card.suit].name+' '+SUIT[card.suit].sym;lbl.style.color=isRed?'var(--red)':'var(--black)';
+    const where=document.createElement('div');where.className='where';where.textContent=`${r+1}. rada`;
+    const tg=document.createElement('button');tg.className='toggle';
+    const setTg=()=>{const o=OTHER[grid[r][c].suit];tg.textContent='Zmeniť na '+SUIT[o].name+' '+SUIT[o].sym;};
+    setTg();
+    tg.onclick=()=>{grid[r][c].suit=OTHER[grid[r][c].suit];
+      item.replaceChild(cardEl(grid[r][c]),item.firstChild);
+      lbl.textContent=SUIT[grid[r][c].suit].name+' '+SUIT[grid[r][c].suit].sym;
+      lbl.style.color=SUIT[grid[r][c].suit].red?'var(--red)':'var(--black)';setTg();};
+    item.append(lbl,where,tg);
+    (isRed?red:black).appendChild(item);
+    if(isRed)anyRed=true;else anyBlack=true;
+  }));
+  $('grpRed').style.display=anyRed?'block':'none';
+  $('grpBlack').style.display=anyBlack?'block':'none';
+  // reset editor
+  $('fullEdit').classList.remove('on');$('editBox').classList.remove('on');
+}
+$('moreBtn').onclick=()=>{const fe=$('fullEdit');fe.classList.toggle('on');if(fe.classList.contains('on'))renderEditGrid();};
+function renderEditGrid(){
+  const g=$('editGrid');g.innerHTML='';
+  grid.forEach((row,r)=>{const rd=document.createElement('div');rd.className='erow';
+    row.forEach((card,c)=>{const el=cardEl(card);el.onclick=()=>openEdit(r,c);rd.appendChild(el);});
+    g.appendChild(rd);});
+}
+function openEdit(r,c){
+  editPos={r,c};
+  document.querySelectorAll('#editGrid .card').forEach(x=>x.classList.remove('sel'));
+  $('editGrid').children[r].children[c].classList.add('sel');
+  const card=grid[r][c];$('editTitle').textContent=`${r+1}. rada, ${c+1}. karta`;
+  const rp=$('rankPicks');rp.innerHTML='';
+  RANKS.forEach(rk=>{const b=document.createElement('button');b.className='pick'+(card.rank===rk?' on':'');b.textContent=rk;
+    b.onclick=()=>{grid[r][c].rank=rk;openEdit(r,c);};rp.appendChild(b);});
+  const sp=$('suitPicks');sp.innerHTML='';
+  Object.keys(SUIT).forEach(sk=>{const b=document.createElement('button');b.className='pick '+(SUIT[sk].red?'red':'black')+(card.suit===sk?' on':'');
+    b.innerHTML=SUIT[sk].sym+' '+SUIT[sk].name;b.onclick=()=>{grid[r][c].suit=sk;openEdit(r,c);};sp.appendChild(b);});
+  $('editBox').classList.add('on');
+  const el=$('editGrid').children[r].children[c];el.replaceWith(cardEl(grid[r][c]));
+  $('editGrid').children[r].children[c].classList.add('sel');$('editGrid').children[r].children[c].onclick=()=>openEdit(r,c);
+}
+$('backTo1').onclick=()=>show('s1');
+$('newImg').onclick=()=>show('s1');
+
+/* ---- KROK 3 – solver + sprievodca ---- */
+$('solveBtn').onclick=()=>{
+  const rows=grid.map(r=>r.filter(Boolean)).filter(r=>r.length);
+  if(!rows.length){alert('Nie sú žiadne karty.');return;}
+  solution=solve(rows);solution.rows=rows;stepIdx=0;renderStep();renderList();show('s3');
+};
+function solve(rows){
+  const R=rows.length,lens=rows.map(r=>r.length),total=lens.reduce((a,b)=>a+b,0);
+  const memo=new Map();let nodes=0;const CAP=1200000;
+  const match=(a,b)=>a.rank===b.rank||a.suit===b.suit;
+  const key=(st,last)=>{let s='';for(let i=0;i<R;i++)s+=st[i][0]+'.'+st[i][1]+',';return s+'|'+(last?last.rank+last.suit:'x');};
+  function edges(st){const es=[];for(let i=0;i<R;i++){const L=st[i][0],Rr=st[i][1];if(L+Rr<lens[i]){const li=L,ri=lens[i]-1-Rr;es.push([i,'L',li]);if(ri!==li)es.push([i,'R',ri]);}}return es;}
+  function dfs(st,last,rem){const k=key(st,last);const m=memo.get(k);if(m)return m;nodes++;let bl=0,bmv=null;
+    if(nodes<=CAP){for(const [i,side,idx] of edges(st)){const c=rows[i][idx];
+      if(!last||match(last,c)){const ns=st.map(x=>x.slice());if(side==='L')ns[i][0]++;else ns[i][1]++;
+        const sub=dfs(ns,c,rem-1);if(1+sub.len>bl){bl=1+sub.len;bmv={i,side};if(bl===rem)break;}}}}
+    const res={len:bl,mv:bmv};memo.set(k,res);return res;}
+  const init=Array.from({length:R},()=>[0,0]);dfs(init,null,total);
+  const steps=[];let st=init.map(x=>x.slice()),last=null;
+  while(steps.length<total){const res=memo.get(key(st,last));if(!res||!res.mv||res.len===0)break;
+    const {i,side}=res.mv;const L=st[i][0],Rr=st[i][1];const col=side==='L'?L:lens[i]-1-Rr;
+    steps.push({row:i,col,side,card:rows[i][col]});if(side==='L')st[i][0]++;else st[i][1]++;last=rows[i][col];}
+  return {steps,total,cleared:steps.length===total};
+}
+// množina odobratých {row:col} po prvých k krokoch
+function takenSet(k){const s=new Set();for(let i=0;i<k;i++)s.add(solution.steps[i].row+':'+solution.steps[i].col);return s;}
+function renderStep(){
+  const N=solution.steps.length;
+  $('progBar').style.width=(N?Math.round(stepIdx/N*100):0)+'%';
+  $('progText').textContent = stepIdx<N ? `Krok ${stepIdx+1} z ${N}` : `Všetko hotové (${N} kariet)`;
+  const guide=$('guide'),done=$('doneMsg'),nav=$('nav');
+  if(stepIdx>=N){
+    guide.hidden=true;done.hidden=false;$('nextBtn').style.display='none';
+    $('doneText').textContent = solution.cleared ? 'Vyčistila si celú dosku. Gratulujem!' : 'Toto bol najlepší možný postup.';
+    renderBoard(N,null);return;
+  }
+  guide.hidden=false;done.hidden=true;$('nextBtn').style.display='';
+  const step=solution.steps[stepIdx];
+  const f=$('focus');f.innerHTML='';
+  const big=cardEl(step.card);big.classList.add('big');f.appendChild(big);
+  const t=document.createElement('div');t.className='txt';
+  const sideName=step.side==='L'?'ĽAVÁ':'PRAVÁ';const arrow=step.side==='L'?'◀':'▶';
+  t.innerHTML=`<p class="take">Nájdi v hre túto kartu a klikni ju:</p>
+    <span class="side ${step.side}">${step.side==='L'?arrow+' ':''}${sideName} strana${step.side==='R'?' '+arrow:''}</span>
+    <div class="where">v ${step.row+1}. rade zhora</div>`;
+  f.appendChild(t);
+  renderBoard(stepIdx,step);
+}
+function renderBoard(k,step){
+  const taken=takenSet(k);const bd=$('board');bd.innerHTML='';
+  solution.rows.forEach((row,r)=>{
+    const rd=document.createElement('div');rd.className='brow'+(step&&step.row===r?' active':'');
+    const rn=document.createElement('div');rn.className='rn';rn.textContent=(r+1)+'.';rd.appendChild(rn);
+    row.forEach((card,c)=>{
+      const isTaken=taken.has(r+':'+c);
+      const isTarget=step&&step.row===r&&step.col===c;
+      const el=cardEl(card, isTaken?'empty':(isTarget?'target':''));
+      if(isTaken){el.innerHTML='';}
+      if(isTarget){const tu=document.createElement('span');tu.className='tu';tu.textContent='▼';el.appendChild(tu);}
+      rd.appendChild(el);
+    });
+    bd.appendChild(rd);
+  });
+}
+function renderList(){
+  const ol=$('stepList');ol.innerHTML='';
+  solution.steps.forEach((st,i)=>{const li=document.createElement('li');
+    li.innerHTML=`<b>${cname(st.card)}</b> — ${st.row+1}. rada, ${st.side==='L'?'ľavá':'pravá'}`;ol.appendChild(li);});
+}
+$('nextBtn').onclick=()=>{if(stepIdx<solution.steps.length){stepIdx++;renderStep();}};
+$('prevBtn').onclick=()=>{if(stepIdx>0){stepIdx--;renderStep();}};
+$('restartBtn').onclick=()=>{stepIdx=0;renderStep();};
+</script>
+</body>
+</html>
